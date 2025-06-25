@@ -193,7 +193,7 @@ This document compares the lifecycles of iOS `UIViewController` and Android `Act
 > **Note:** Both frameworks are declarative, reactive, and support composition of UI components based on state.
 
 
-# SwiftUI vs Jetpack Compose – Similar Methods & Functional Concepts
+## SwiftUI vs Jetpack Compose – Similar Methods & Functional Concepts
 
 | **Purpose**                      | **SwiftUI Method / Concept**             | **Jetpack Compose Method / Concept**       | **Notes / Similarity**                                                        |
 |----------------------------------|------------------------------------------|--------------------------------------------|-------------------------------------------------------------------------------|
@@ -509,7 +509,7 @@ fun RemoteImageView() {
 
 
 
-# Dark Theme Handling – SwiftUI vs Jetpack Compose
+## Dark Theme Handling – SwiftUI vs Jetpack Compose
 
 | **Aspect**                      | **SwiftUI (iOS)**                                                                 | **Jetpack Compose (Android)**                                                                 |
 |---------------------------------|------------------------------------------------------------------------------------|-----------------------------------------------------------------------------------------------|
@@ -523,7 +523,7 @@ fun RemoteImageView() {
 
 
 
-# Localization / Language Change – SwiftUI vs Jetpack Compose
+## Localization / Language Change – SwiftUI vs Jetpack Compose
 
 | **Aspect**                      | **SwiftUI (iOS)**                                                                 | **Jetpack Compose (Android)**                                                              |
 |----------------------------------|-----------------------------------------------------------------------------------|---------------------------------------------------------------------------------------------|
@@ -536,7 +536,7 @@ fun RemoteImageView() {
 | **Dynamic Updates**             | ❌ Requires manual handling of view updates                                       | ✅ Supported on API 33+ or with libraries                                                   |
 
 
-# Map Loading & Current Location – SwiftUI vs Jetpack Compose
+## Map Loading & Current Location – SwiftUI vs Jetpack Compose
 
 | **Aspect**                  | **SwiftUI (iOS – MapKit)**                                                                 | **Jetpack Compose (Android – Google Maps)**                                                             |
 |-----------------------------|----------------------------------------------------------------------------------------------|----------------------------------------------------------------------------------------------------------|
@@ -547,3 +547,104 @@ fun RemoteImageView() {
 | **Access User Location**    | Use `CLLocationManager` with delegate                                                       | Use `FusedLocationProviderClient.getLastLocation()` or `LocationCallback`                               |
 | **Display Marker (Pin)**    | Add `Annotation` in `Map(coordinateRegion:annotationItems:)`                               | Use `Marker(state = MarkerState(position = LatLng(...)))`                                               |
 
+<br>
+<br>
+
+## 🔔 Push Notifications: iOS vs Android Comparison
+
+This document outlines how push notifications are handled on iOS (using APNs) and Android (using Firebase Cloud Messaging - FCM), including registration, permissions, handling, and display.
+
+
+| Feature                        | **iOS (APNs)**                                                               | **Android (FCM)**                                                                     |
+|-------------------------------|------------------------------------------------------------------------------|----------------------------------------------------------------------------------------|
+| **Push Service**              | Apple Push Notification Service (APNs)                                       | Firebase Cloud Messaging (FCM)                                                        |
+| **Permission Required**       | ✅ Yes (explicit user permission)                                            | ❌ No explicit permission (granted by default)                                         |
+| **Token Registration**        | Manual registration via `UIApplication`                                     | Automatic via `FirebaseMessaging.getInstance().getToken()`                            |
+| **Foreground Handling**       | `userNotificationCenter(_:willPresent:withCompletionHandler:)`              | `onMessageReceived()` in `FirebaseMessagingService`                                   |
+| **Background/Terminated**     | System delivers notification and wakes app                                  | System handles and wakes app as needed                                                |
+| **Rich Content (image, etc.)**| ✅ Supported via Notification Service Extension                              | ✅ Supported with media keys in payload                                                |
+| **Click Handling**            | `userNotificationCenter(_:didReceive:withCompletionHandler:)`               | `PendingIntent` + Intent handling in notification builder or `FirebaseMessagingService` |
+
+---
+
+
+### Swift
+
+@main
+```class AppDelegate: UIResponder, UIApplicationDelegate, UNUserNotificationCenterDelegate {
+    
+    func application(_ application: UIApplication,
+                     didFinishLaunchingWithOptions launchOptions: [UIApplication.LaunchOptionsKey: Any]?) -> Bool {
+        
+        UNUserNotificationCenter.current().delegate = self
+        UNUserNotificationCenter.current().requestAuthorization(options: [.alert, .badge, .sound]) { granted, _ in
+            if granted {
+                DispatchQueue.main.async {
+                    UIApplication.shared.registerForRemoteNotifications()
+                }
+            }
+        }
+        return true
+    }
+
+    func application(_ application: UIApplication,
+                     didRegisterForRemoteNotificationsWithDeviceToken deviceToken: Data) {
+        // Send token to server
+        let token = deviceToken.map { String(format: "%02.2hhx", $0) }.joined()
+        print("iOS Device Token: \(token)")
+    }
+
+    // Handle foreground notification
+    func userNotificationCenter(_ center: UNUserNotificationCenter,
+                                willPresent notification: UNNotification,
+                                withCompletionHandler completionHandler: @escaping (UNNotificationPresentationOptions) -> Void) {
+        completionHandler([.banner, .sound])
+    }
+
+    // Handle tap on notification
+    func userNotificationCenter(_ center: UNUserNotificationCenter,
+                                didReceive response: UNNotificationResponse,
+                                withCompletionHandler completionHandler: @escaping () -> Void) {
+        print("Notification tapped: \(response.notification.request.identifier)")
+        completionHandler()
+    }
+}
+```
+
+### Android
+
+```
+class MyFirebaseService : FirebaseMessagingService() {
+
+    override fun onNewToken(token: String) {
+        super.onNewToken(token)
+        Log.d("FCM", "New token: $token")
+        // Send token to server
+    }
+
+    override fun onMessageReceived(remoteMessage: RemoteMessage) {
+        super.onMessageReceived(remoteMessage)
+        // Handle foreground data message
+        Log.d("FCM", "Message: ${remoteMessage.data}")
+    }
+
+    fun showNotification(context: Context, title: String, message: String) {
+        val channelId = "my_channel"
+
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+            val channel = NotificationChannel(channelId, "Default", NotificationManager.IMPORTANCE_DEFAULT)
+            val manager = context.getSystemService(NotificationManager::class.java)
+            manager.createNotificationChannel(channel)
+        }
+
+        val notification = NotificationCompat.Builder(context, channelId)
+            .setContentTitle(title)
+            .setContentText(message)
+            .setSmallIcon(R.drawable.ic_notification)
+            .build()
+
+        val manager = context.getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
+        manager.notify(0, notification)
+    }
+}
+```
